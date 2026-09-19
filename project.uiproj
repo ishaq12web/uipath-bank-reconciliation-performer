@@ -1,0 +1,6 @@
+{
+  "Name": "BankReconciliation_Performer",
+  "ProjectType": "Process",
+  "Description": "Enterprose bank reconciliation performer using Orchestrator Queues, ledger API matching, exception handling and disaster recovery",
+  "MainFile": "Main.xaml"
+}
