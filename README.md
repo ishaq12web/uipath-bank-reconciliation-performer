@@ -1,450 +1,235 @@
-### Documentation is included in the Documentation folder ###
+Portfolio project demonstrating input validation, queue-based automation, traceability, and a Dispatcher–Performer architecture.
+```
 
+**Performer repository — `README.md`**
 
-### REFrameWork Template ###
-**Robotic Enterprise Framework**
+```markdown
+# Bank Reconciliation Performer
 
-* Built on top of *Transactional Business Process* template
-* Uses *State Machine* layout for the phases of automation project
-* Offers high level logging, exception handling and recovery
-* Keeps external settings in *Config.xlsx* file and Orchestrator assets
-* Pulls credentials from Orchestrator assets and *Windows Credential Manager*
-* Gets transaction data from Orchestrator queue and updates back status
-* Takes screenshots in case of system exceptions
+A UiPath REFramework automation that retrieves bank transactions from Orchestrator, reconciles them against a CSV ledger, writes reconciliation results, and routes business exceptions to a separate investigation queue.
 
+**Companion repository:** [Bank Reconciliation Dispatcher](https://github.com/ishaq12web/uipath-bank-reconciliation)
 
-### How It Works ###
+## Project status
 
-1. **INITIALIZE PROCESS**
- + ./Framework/*InitiAllSettings* - Load configuration data from Config.xlsx file and from assets
- + ./Framework/*GetAppCredential* - Retrieve credentials from Orchestrator assets or local Windows Credential Manager
- + ./Framework/*InitiAllApplications* - Open and login to applications used throughout the process
+Working portfolio demonstration using synthetic data and a dummy CSV ledger.
 
-2. **GET TRANSACTION DATA**
- + ./Framework/*GetTransactionData* - Fetches transactions from an Orchestrator queue defined by Config("OrchestratorQueueName") or any other configured data source
+Verified scenarios:
 
-3. **PROCESS TRANSACTION**
- + *Process* - Process trasaction and invoke other workflows related to the process being automated 
- + ./Framework/*SetTransactionStatus* - Updates the status of the processed transaction (Orchestrator transactions by default): Success, Business Rule Exception or System Exception
+- A matching transaction completes successfully.
+- A transaction without a ledger match raises a business exception.
+- Both outcomes appear in the reconciliation CSV.
+- The unmatched case is routed to the exception queue.
 
-4. **END PROCESS**
- + ./Framework/*CloseAllApplications* - Logs out and closes applications used throughout the process
+Production hardening and broader automated test coverage remain in progress.
 
+## Business problem
 
-### For New Project ###
+Bank statement transactions need to be compared with ledger records, with differences recorded for investigation.
 
-1. Check the Config.xlsx file and add/customize any required fields and values
-2. Implement InitiAllApplications.xaml and CloseAllApplicatoins.xaml workflows, linking them in the Config.xlsx fields
-3. Implement GetTransactionData.xaml and SetTransactionStatus.xaml according to the transaction type being used (Orchestrator queues by default)
-4. Implement Process.xaml workflow and invoke other workflows related to the process being automated
+This automation separates successful matches from business exceptions and retains transaction identifiers, amounts, timestamps, and failure reasons in its output.
 
+## Architecture
 
+```mermaid
+flowchart TD
+    A[BankReconciliationQueue] --> B[REFramework Performer]
+    C[Dummy CSV ledger] --> B
+    B --> D{Reconciliation result}
+    D -->|Matched| E[Successful queue item]
+    D -->|Business exception| F[Failed queue item]
+    E --> G[CSV report]
+    F --> G
+    F --> H[BR_EXCEPTION_QUEUE]
+```
 
-This repository contains the **Performer** component of an enterprise-style Bank Reconciliation automation built with UiPath.
- 
-The solution follows a **Dispatcher / Performer architecture** using:
- 
-- UiPath Studio
-- UiPath Orchestrator Queues
-- Robotic Enterprise Framework (REFramework)
-- Transaction-based processing
-- Business and System Exception handling
-- Retry and recovery mechanisms
-- Logging and auditability
-- Automated testing
- 
----
- 
-## Solution Architecture
- 
-The complete Bank Reconciliation solution consists of two UiPath processes:
- 
-```text
-Bank Statement / Transaction Source
-                |
-                v
-+--------------------------------+
-| Bank Reconciliation Dispatcher |
-|                                |
-| Read input data                |
-| Validate transactions          |
-| Prepare queue items            |
-| Add items to Orchestrator      |
-+---------------+----------------+
-                |
-                v
-        UiPath Orchestrator
-          BR_RECON_QUEUE
-                |
-                v
-+--------------------------------+
-| Bank Reconciliation Performer  |
-|                                |
-| REFramework                    |
-| Get Queue Item                 |
-| Process Transaction            |
-| Reconcile Transaction          |
-| Handle Exceptions              |
-| Set Transaction Status         |
-+---------------+----------------+
-                |
-                v
-       Reconciliation Result
-Performer Responsibility
-The Performer consumes transaction items created by the Dispatcher and stored in the UiPath Orchestrator queue.
-The Performer is responsible for processing each transaction independently and updating its final status.
-The project is implemented using the UiPath Robotic Enterprise Framework (REFramework) to provide reliability, exception handling, retries, logging and recovery.
-REFramework Architecture
-The Performer follows the standard REFramework state-machine pattern:
-START
-  |
-  v
-INIT
-  |
-  |-- Load Config.xlsx
-  |-- Load Orchestrator Assets
-  |-- Initialize applications/resources
-  |
-  v
-GET TRANSACTION DATA
-  |
-  |-- Retrieve next Queue Item
-  |-- No more transactions?
-  |       |
-  |       +---- YES ----> END PROCESS
-  |
-  v
-PROCESS TRANSACTION
-  |
-  |-- Validate transaction
-  |-- Perform reconciliation
-  |-- Apply matching rules
-  |-- Generate transaction result
-  |
-  +-----------------------------+
-  |                             |
-SUCCESS                  EXCEPTION
-  |                             |
-  v                             v
-Set Successful          Business Exception
-Status                  or System Exception
-  |                             |
-  +-------------+---------------+
-                |
-                v
-       GET NEXT TRANSACTION
-                |
-                v
-           END PROCESS
-Orchestrator Queue
-The Performer consumes transactions from the following UiPath Orchestrator queue:
-BR_RECON_QUEUE
-Each queue item represents one reconciliation transaction.
-Queue-based processing provides:
-Transaction-level isolation
-Centralized monitoring
-Retry support
-Status tracking
-Scalability
-Improved auditability
-Better failure recovery
-Dispatcher / Performer Pattern
-The project uses a two-process architecture.
-Dispatcher
-The Dispatcher:
-Reads transaction input
-        |
-        v
-Validates input
-        |
-        v
-Transforms data
-        |
-        v
-Creates queue items
-        |
-        v
-BR_RECON_QUEUE
-The Dispatcher does not perform the full reconciliation.
-Performer
-The Performer:
-BR_RECON_QUEUE
-        |
-        v
-Get Queue Item
-        |
-        v
-Validate Transaction
-        |
-        v
-Perform Reconciliation
-        |
-        v
-Set Transaction Status
-This separation makes the automation easier to scale, recover and maintain.
-REFramework States
-1. Init
-The Init state prepares the automation environment.
-Typical responsibilities include:
-Load configuration
-Load Orchestrator assets
-Initialize applications
-Initialize connections
-Validate required resources
-Prepare logging
-Relevant workflows may include:
-Framework/InitAllSettings.xaml
-Framework/InitAllApplications.xaml
-Framework/KillAllProcesses.xaml
-2. Get Transaction Data
-This state retrieves the next transaction from the Orchestrator queue.
-The Performer continues requesting queue items until no new transaction is available.
-Example flow:
-Get Transaction Item
-        |
-        v
-Transaction Found?
-   /          \
-YES           NO
-|              |
-v              v
-Process        End
-Transaction    Process
-3. Process Transaction
-This is where the main Bank Reconciliation business logic is executed.
-The processing workflow can include:
-Read queue transaction data
-Validate required fields
-Retrieve corresponding internal record
-Apply matching logic
-Compare transaction values
-Determine reconciliation result
-Prepare output/result data
-The core processing workflow is:
-Process.xaml
-4. End Process
-The End Process state performs cleanup before the automation terminates.
-Examples include:
-Close applications
-Release resources
-Close connections
-Write final logs
-Perform cleanup
-Exception Handling
-The Performer differentiates between two major exception categories.
-Business Exception
-A Business Exception occurs when the system is functioning correctly but the transaction violates a business rule.
-Examples:
-Missing transaction reference
-Invalid transaction amount
-Unsupported transaction type
-Transaction already processed
-Transaction cannot be matched
-Required business data is missing
-Business Exceptions are normally not retried automatically because repeating the same transaction will not correct the underlying business problem.
-System Exception
-A System Exception occurs because of a technical or environmental problem.
-Examples:
-Application unavailable
-Network interruption
-Orchestrator communication failure
-Database connection failure
-File temporarily unavailable
-Unexpected application crash
-Timeout
-System Exceptions may be retried according to the REFramework and Orchestrator retry configuration.
-Retry Strategy
-The Performer supports transaction retry for recoverable technical failures.
-Example:
-Transaction
-    |
-    v
-Process
-    |
-    v
-System Exception
-    |
-    v
-Retry Allowed?
-   /      \
-YES       NO
-|          |
-v          v
-Retry     Failed
-Business Exceptions are generally not retried automatically.
-System Exceptions may be retried based on the configured retry policy.
-Transaction Status
-Each queue transaction can finish with one of several statuses.
-Successful
- 
-Failed
-   |
-   +-- Business Exception
-   |
-   +-- System Exception
-The SetTransactionStatus workflow is responsible for updating the transaction status and recording relevant exception information.
-Disaster Recovery
-The Dispatcher / Performer architecture provides strong recovery capabilities.
-If the robot stops unexpectedly:
-Completed transactions
-        |
-        +---- Remain completed
- 
-Pending transactions
-        |
-        +---- Remain available in queue
- 
-System-failed transactions
-        |
-        +---- Can be retried
- 
-New robot session
-        |
-        +---- Continues remaining work
-This means the entire reconciliation batch does not need to restart after a failure.
-The queue acts as a persistent transaction store.
-Project Structure
-Example project structure:
-BankReconciliation_Performer/
-│
-├── Main.xaml
-├── Main.xaml.json
-├── project.json
-├── project.uiproj
-├── README.md
-├── LICENSE
-├── .gitignore
-│
-├── Data/
-│   └── Config.xlsx
-│
-├── Framework/
-│   ├── InitAllSettings.xaml
-│   ├── InitAllApplications.xaml
-│   ├── KillAllProcesses.xaml
-│   ├── GetTransactionData.xaml
-│   ├── SetTransactionStatus.xaml
-│   ├── RetryCurrentTransaction.xaml
-│   ├── TakeScreenshot.xaml
-│   └── Process.xaml
-│
-└── Tests/
-    ├── MainTestCase.xaml
-    ├── ProcessTestCase.xaml
-    ├── GetTransactionDataTest.xaml
-    ├── InitAllSettingsTest.xaml
-    ├── InitAllApplicationsTest.xaml
-    └── Tests.xlsx
-Exact file names may differ depending on the REFramework version.
-Configuration
-Runtime configuration is stored primarily in:
-Data/Config.xlsx
-The configuration can contain references to:
-Queue names
-Application paths
-Retry settings
-Timeout values
-Business configuration
-Orchestrator Asset names
-Environment-specific settings
-Sensitive values should not be stored directly in Config.xlsx.
-Security
-Credentials and sensitive information should never be hard-coded into workflows or committed to source control.
-Sensitive information should instead be stored using:
-UiPath Orchestrator Credential Assets
-UiPath Orchestrator Assets
-Environment variables
-External secret-management solutions
-Examples of information that should not be committed:
-Passwords
-API keys
-Authentication tokens
-Production banking information
-Customer account information
-Real transaction data
-Private certificates
-Testing
-The project contains REFramework test workflows that can be used to validate individual components.
-Examples include:
-GetTransactionDataTest
-InitAllApplicationsTest
-InitAllSettingsTest
-MainTestCase
-ProcessTestCase
-WorkflowTestCase
-Testing individual workflows helps identify failures before deploying the automation to production.
-Running the Project on Another Computer
-Clone the repository:
-git clone https://github.com/YOUR_USERNAME/uipath-bank-reconciliation-performer.git
-Open the cloned project in UiPath Studio.
-UiPath Studio should restore the activity-package dependencies defined in the project.
-Connect the UiPath Robot or Studio environment to the correct Orchestrator tenant.
-Ensure that the following queue exists:
-BR_RECON_QUEUE
-Also configure any required Orchestrator Assets referenced by Config.xlsx.
-Then run:
-Main.xaml
-Required Environment
-The project requires:
-UiPath Studio Desktop
-UiPath Robot
-UiPath Orchestrator
-Git
-Access to BR_RECON_QUEUE
-Required Orchestrator Assets
-Required UiPath activity packages
-Related Repository
-The transaction Dispatcher is maintained separately.
-uipath-bank-reconciliation-dispatcher
-The Dispatcher reads the transaction source and sends transactions into:
-BR_RECON_QUEUE
-The Performer then consumes and processes those transactions.
-GitHub link:
-https://github.com/YOUR_USERNAME/uipath-bank-reconciliation-dispatcher
-Replace YOUR_USERNAME with the correct GitHub username.
-End-to-End Processing
-Source Transactions
-       |
-       v
-Dispatcher
-       |
-       v
-Validate Data
-       |
-       v
-Create Queue Items
-       |
-       v
-BR_RECON_QUEUE
-       |
-       v
-REFramework Performer
-       |
-       v
-Get Transaction
-       |
-       v
-Perform Reconciliation
-       |
-       +-------------------------+
-       |                         |
-       v                         v
-    Success                  Exception
-                                 |
-                         +-------+-------+
-                         |               |
-                         v               v
-                    Business         System
-                    Exception       Exception
-                                         |
-                                         v
-                                       Retry
-       |
-       v
-Set Queue Status
-       |
-       v
-Next Transaction
-       |
-       v
-Final
+## Features
+
+- REFramework transaction processing and exception handling.
+- Configuration loaded from `Data/Config.xlsx`.
+- Ledger loading through a separate workflow.
+- Case-insensitive matching by transaction reference.
+- Detection of missing and multiple ledger matches.
+- Account and currency comparison.
+- Debit and credit parsing and validation.
+- Configurable amount and date tolerances.
+- CSV reporting for matched and unmatched transactions.
+- System-error reporting logic.
+- Routing of business exceptions to an investigation queue.
+
+## Reconciliation rules
+
+A transaction passes only when:
+
+1. Exactly one ledger row matches its transaction reference.
+2. Account numbers match after trimming.
+3. Currency codes match, ignoring case.
+4. Debit and credit values have valid formats.
+5. Each record has exactly one positive debit or credit.
+6. Bank and ledger debit/credit directions agree.
+7. Amount differences are within `AmountTolerance`.
+8. Both transaction dates use `yyyy-MM-dd`.
+9. The date difference is within `DateToleranceDays`.
+
+The dummy ledger uses the same debit/credit direction convention as the bank input.
+
+Matching selects candidates by reference first. Multiple rows with the same reference are treated as ambiguous.
+
+`ValueDate` and `Description` are not currently matching criteria.
+
+## Technology
+
+- UiPath Studio Desktop
+- UiPath REFramework
+- C# expressions and LINQ
+- UiPath Orchestrator queues
+- CSV ledger and reconciliation report
+- Excel configuration workbook
+
+Activity dependencies are defined in `project.json`.
+
+## Main workflows
+
+| File | Responsibility |
+|---|---|
+| Main.xaml | REFramework orchestration and shared data |
+| Framework/InitAllSettings.xaml | Configuration loading |
+| LoadLedger.xaml | Read the dummy ledger |
+| Framework/GetTransactionData.xaml | Retrieve a queue transaction |
+| Framework/Process.xaml | Apply reconciliation rules and report matches |
+| Framework/SetTransactionStatus.xaml | Update statuses, report failures, and route business exceptions |
+| RequeueTestItem.xaml | Create synthetic matched and unmatched test items |
+
+## Configuration
+
+Review the Settings sheet in `Data/Config.xlsx`.
+
+| Setting | Example value |
+|---|---|
+| OrchestratorQueueName | BankReconciliationQueue |
+| ReconQueueName | BankReconciliationQueue |
+| ExceptionQueueName | BR_EXCEPTION_QUEUE |
+| LedgerFilePath | Data\Input\DummyLedger.csv |
+| ReconciliationReportPath | Data\Output\ReconciliationReport.csv |
+| AmountTolerance | 0 |
+| DateToleranceDays | 2 |
+
+Keep the existing REFramework Settings and Constants entries.
+
+Queue activities must resolve to the folder containing the queues. The demonstrated setup uses a blank activity Folder Path to inherit the current execution folder. Review this when moving to another environment.
+
+## Ledger format
+
+The CSV ledger uses these columns:
+
+`LedgerTxnId, AccountNumber, TransactionDate, ValueDate, TransactionReference, Description, Debit, Credit, Currency`
+
+Keep account numbers as text and dates in `yyyy-MM-dd` format.
+
+Quote CSV values containing commas, such as `"25,000"`.
+
+The current demo includes ledger reference `TRF10008`, which can be used for a matched test.
+
+## Setup and execution
+
+1. Clone the repository and open `project.json` in UiPath Studio.
+2. Restore dependencies.
+3. Connect Studio and the Robot to Orchestrator.
+4. Create these queues in the intended folder:
+   - `BankReconciliationQueue`
+   - `BR_EXCEPTION_QUEUE`
+5. Update `Data/Config.xlsx` for your environment.
+6. Verify `Data/Input/DummyLedger.csv` exists.
+7. Create the `Data/Output` folder.
+8. Populate the source queue through the Dispatcher or test helper.
+9. Run `Main.xaml`.
+10. Inspect the queue statuses, CSV report, and exception queue.
+
+Run `RequeueTestItem.xaml` explicitly with Run File when creating test items. Running the project starts Main.
+
+## Demonstrated test scenarios
+
+| Scenario | Input | Expected and observed result |
+|---|---|---|
+| Match | Reference TRF10008 with matching account, amounts, currency, and date | Successful queue item and Matched report row |
+| Missing ledger record | Reference TRF99999 | Business Exception, Unmatched report row, and investigation queue item |
+
+The test helper generates timestamp-based bank transaction identifiers.
+
+Additional tests are planned for duplicate ledger references, amount mismatch, currency mismatch, account mismatch, date tolerance boundaries, malformed data, and infrastructure failures.
+
+## Reconciliation report
+
+Default output:
+
+`Data/Output/ReconciliationReport.csv`
+
+Columns:
+
+`BankTxnId, LedgerTxnId, TransactionReference, Status, Reason, BankDebit, BankCredit, LedgerDebit, LedgerCredit, Currency, ProcessedAt, RunId`
+
+Current statuses:
+
+- `Matched`
+- `Unmatched`
+- `SystemError`
+
+Business-rule failures share the `Unmatched` status; `Reason` identifies the specific failure.
+
+Matched amounts are normalized. Failure rows preserve original bank amount strings where available.
+
+The report is accumulated in memory and written during processing. Each run starts with an empty table, and its first report write replaces the previous file. A run with no transactions leaves the existing file unchanged.
+
+## Exception queue
+
+Business exceptions are sent to `BR_EXCEPTION_QUEUE` with:
+
+- OriginalBankTxnId
+- TransactionReference
+- FailureReason
+- ExceptionType
+- Debit
+- Credit
+- Currency
+- RunId
+- SourceQueue
+- FailedAt
+
+The exception reference combines the original reference with an exception timestamp.
+
+This queue captures cases for investigation. Automatic case resolution and reprocessing are not implemented.
+
+## Known limitations
+
+- The ledger is a local CSV; API integration is planned.
+- Reports are overwritten across runs and are not designed for concurrent robot writers.
+- Queue status updates, CSV writes, and exception routing are separate operations rather than one atomic transaction.
+- Timestamp-based exception references do not prevent duplicate investigation cases after reprocessing.
+- System-error reporting and retry recovery require additional end-to-end testing.
+- The template ProcessTestCase requires updated argument mappings and proper test fixtures; analyzer warning SY-USG-015 is pending.
+- Successful matching does not mark a ledger row as consumed, so another bank item with the same reference can match it again.
+- Performance has not been benchmarked at production volumes.
+
+## Repository contents
+
+Keep workflows, project configuration, and synthetic test inputs under version control.
+
+Exclude generated runtime reports, logs, screenshots, local caches, and temporary Excel lock files.
+
+A curated synthetic report can be stored separately under `docs/samples/` as demonstration evidence.
+
+## Planned improvements
+
+- Preserve reports by run and support safe recovery.
+- Prevent duplicate ledger consumption and duplicate exception cases.
+- Add automated tests and resolve the template analyzer warning.
+- Validate ledger schema during initialization.
+- Replace the dummy ledger with an API integration.
+- Add operational metrics and a documented deployment procedure.
+
+## Author
+
+Ishaku Danladi
+
+Portfolio project demonstrating REFramework, Orchestrator queues, configurable reconciliation rules, exception handling, and reporting.
+```
