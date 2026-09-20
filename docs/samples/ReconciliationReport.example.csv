@@ -1,0 +1,2 @@
+﻿BankTxnId,LedgerTxnId,TransactionReference,Status,Reason,BankDebit,BankCredit,LedgerDebit,LedgerCredit,Currency,ProcessedAt,RunId
+BTXTEST-M-20260920104626863,LED000008,TRF10008,Matched,,25000,0,25000,0,NGN,2026-09-20 10:47:06,BR-REPORT-TEST-20260920
