@@ -199,6 +199,15 @@ The exception reference combines the original reference with an exception timest
 
 This queue captures cases for investigation. Automatic case resolution and reprocessing are not implemented.
 
+## Demo evidence
+
+The sample run demonstrates a successful ledger match and a missing-ledger business exception.
+
+- [Sample reconciliation report](docs/samples/ReconciliationReport.example.csv)
+- Screenshots are available in [docs/screenshots](docs/screenshots).
+
+The examples use synthetic transaction data.
+
 ## Known limitations
 
 - The ledger is a local CSV; API integration is planned.
